@@ -29,9 +29,18 @@ export default function LoginForm() {
     e.preventDefault();
     setBusy(true);
     clearToken();
-    const { error } = await authClient.signIn.email({ email: form.email.trim(), password: form.password });
+    const attempt = () => authClient.signIn.email({ email: form.email.trim(), password: form.password });
+    let { error } = await attempt();
+    // A 5xx means the server (not the credentials) failed, e.g. a cold start. Retry once.
+    if (error && (!error.status || error.status >= 500)) {
+      await new Promise((r) => setTimeout(r, 1200));
+      ({ error } = await attempt());
+    }
     setBusy(false);
-    if (error) return toast.error(error.message || "Invalid email or password");
+    if (error) {
+      const serverProblem = !error.status || error.status >= 500;
+      return toast.error(serverProblem ? "Server is waking up. Please try again in a few seconds." : error.message || "Invalid email or password");
+    }
     await Swal.fire({ icon: "success", title: "Welcome back!", text: "You have logged in successfully.", timer: 1500, showConfirmButton: false });
     router.replace(redirect);
     router.refresh();
@@ -39,10 +48,14 @@ export default function LoginForm() {
 
   const google = async () => {
     setBusy(true);
-    const { error } = await authClient.signIn.social({ provider: "google", callbackURL: redirect });
+    let { error } = await authClient.signIn.social({ provider: "google", callbackURL: redirect });
+    if (error && (!error.status || error.status >= 500)) {
+      await new Promise((r) => setTimeout(r, 1200));
+      ({ error } = await authClient.signIn.social({ provider: "google", callbackURL: redirect }));
+    }
     if (error) {
       setBusy(false);
-      toast.error(error.message || "Google sign-in failed");
+      toast.error(error.status >= 500 || !error.status ? "Server is waking up. Please try again in a few seconds." : error.message || "Google sign-in failed");
     }
   };
 
