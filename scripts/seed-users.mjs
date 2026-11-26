@@ -1,7 +1,9 @@
 // Creates demo accounts for each role (run once after setting .env.local).
 // Usage: npm run seed:users
 import { MongoClient } from "mongodb";
-import { auth } from "../lib/auth.js";
+import { getAuth } from "../lib/auth.js";
+
+const auth = await getAuth();
 
 const users = [
   { name: "GearLoop Admin", email: "admin@gearloop.demo", password: "Admin@123", role: "admin" },
